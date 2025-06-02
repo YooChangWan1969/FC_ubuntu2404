@@ -1,0 +1,175 @@
+name: Build Android
+on:
+  push:
+    branches: 
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      KIVY_GL_BACKEND: 'gl'
+      CFLAGS: "-I$HOME/.buildozer/android/platform/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include"
+      LDFLAGS: "-L$HOME/.buildozer/android/platform/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib"
+      PYTHONPATH: "$PYTHONPATH:$HOME/.buildozer/android/platform/android-sdk/tools/lib"
+      JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Date
+        id: get-date
+        run: |
+          echo "date=$(date -u '+%Y%m%d')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-global-${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-global-${{ runner.os }}-
+      - name: Cache Buildozer directory in app
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-buildozer-${{ github.run_id }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-buildozer-
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer/android/platform/android-sdk
+          key: ${{ runner.os }}-android-sdk-${{ steps.get-date.outputs.date }}
+          restore-keys: |
+            ${{ runner.os }}-android-sdk-
+      - name: Cache Android NDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer/android/platform/android-ndk-r25b
+          key: ${{ runner.os }}-android-ndk-${{ steps.get-date.outputs.date }}
+          restore-keys: |
+            ${{ runner.os }}-android-ndk-
+
+      - name: Install Python and basic dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-pip \
+            python3
+
+      - name: Install build tools and SDL2 dependencies
+        run: |
+          sudo apt-get -y install python3-dev build-essential git make autoconf automake libtool \
+            pkg-config cmake ninja-build libasound2-dev libpulse-dev libaudio-dev \
+            libjack-dev libsndio-dev libsamplerate0-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev \
+            libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+            libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev fcitx-libs-dev
+
+      - name: Install additional system dependencies
+        run: |
+          sudo apt-get install -y \
+            ffmpeg \
+            libsdl2-dev \
+            libsdl2-image-dev \
+            libsdl2-mixer-dev \
+            libsdl2-ttf-dev \
+            libportmidi-dev \
+            libswscale-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            libunwind-dev \
+            zlib1g-dev \
+            libgstreamer1.0-dev \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good
+
+      - name: Install Kivy
+        run: |
+          sudo add-apt-repository ppa:kivy-team/kivy
+          sudo apt-get update
+          sudo apt-get install python3-kivy
+
+      - name: Fix Python externally-managed error
+        run: |
+          sudo rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED || true
+
+      - name: Install build dependencies and tools
+        run: |
+          sudo apt-get install -y \
+            zip \
+            unzip \
+            gettext \
+            autopoint \
+            autoconf \
+            libtool \
+            pkg-config \
+            libncurses5-dev \
+            libncursesw5-dev \
+            cmake \
+            libffi-dev \
+            libssl-dev \
+            libltdl-dev \
+            automake \
+            libsqlite3-dev \
+            sqlite3 \
+            bzip2 \
+            libbz2-dev \
+            zlib1g-dev \
+            openssl \
+            libgdbm-dev \
+            libgdbm-compat-dev \
+            libnss3-dev \
+            liblzma-dev \
+            libreadline-dev \
+            uuid-dev \
+            cython3
+
+      - name: Install libtinfo5 (for Buildozer compatibility)
+        run: |
+          wget http://launchpadlibrarian.net/371711898/libtinfo5_6.1-1ubuntu1.18.04_amd64.deb
+          sudo dpkg -i libtinfo5_6.1-1ubuntu1.18.04_amd64.deb || true
+          sudo apt-get install -f -y
+
+      - name: Install OpenJDK 17
+        run: |
+          sudo apt install -y openjdk-17-jdk
+
+      - name: Set up Python 3.11 (using actions)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11.0'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Cython==0.29.33 virtualenv
+          echo "export PATH=\$PATH:~/.local/bin/" >> ~/.bashrc
+          export PATH=$PATH:~/.local/bin/
+
+      - name: Install Buildozer
+        run: |
+          pip install buildozer
+
+      - name: Build with Buildozer
+        run: |
+          export PATH=$JAVA_HOME/bin:$PATH:~/.local/bin/
+          export PYTHONPATH="${PYTHONPATH}:${HOME}/.buildozer/android/platform/build-arm64-v8a/build/other_builds/python3-liblzma/arm64-v8a__ndk_target_21/python3/Include"
+          export CFLAGS="-I${HOME}/.buildozer/android/platform/build-arm64-v8a/build/other_builds/python3-liblzma/arm64-v8a__ndk_target_21/python3/Include"
+          export LDFLAGS="-L${HOME}/.buildozer/android/platform/build-arm64-v8a/build/other_builds/python3-liblzma/arm64-v8a__ndk_target_21/python3/android-build"
+          yes | buildozer -v android release
+        env:
+          BUILDOZER_WARN_ON_ROOT: 0
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: |
+            bin/*.apk
+            bin/*.aab
