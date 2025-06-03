@@ -115,19 +115,9 @@ jobs:
         echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
         echo "/usr/lib/jvm/java-17-openjdk-amd64/bin" >> $GITHUB_PATH
     
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v3
-    
-    - name: Install Android SDK components
+    - name: Create buildozer directories
       run: |
-        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        sdkmanager "ndk;21.4.7075529"
-    
-    - name: Set Android environment variables
-      run: |
-        echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        echo "NDK_PATH=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> $GITHUB_ENV
+        mkdir -p ~/.buildozer/android/platform
     
     - name: Install Python packages
       run: |
@@ -151,25 +141,40 @@ jobs:
           buildozer init
         fi
     
-    - name: Configure buildozer.spec for GitHub Actions
+    - name: Accept Android SDK licenses
       run: |
-        # Update buildozer.spec with proper Android SDK paths
-        if [ -f buildozer.spec ]; then
-          sed -i "s|#android.sdk_path =|android.sdk_path = $ANDROID_SDK_ROOT|g" buildozer.spec
-          sed -i "s|#android.ndk_path =|android.ndk_path = $ANDROID_SDK_ROOT/ndk/21.4.7075529|g" buildozer.spec
-          sed -i "s|#android.api =|android.api = 33|g" buildozer.spec
-          sed -i "s|#android.minapi =|android.minapi = 21|g" buildozer.spec
-          sed -i "s|#android.ndk =|android.ndk = 21.4.7075529|g" buildozer.spec
-          sed -i "s|#android.accept_sdk_license =|android.accept_sdk_license = True|g" buildozer.spec
-        fi
+        mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+        echo "d975f751698a77b662f1254ddbeed3901e976f5a" > ~/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
+    
+    - name: Download and setup Android SDK manually for Buildozer
+      run: |
+        # Download Android SDK command line tools
+        cd ~/.buildozer/android/platform/
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip commandlinetools-linux-9477386_latest.zip
+        mkdir -p android-sdk/cmdline-tools
+        mv cmdline-tools android-sdk/cmdline-tools/latest
+        
+        # Set up SDK paths
+        export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+        
+        # Install necessary components
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
+        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "ndk;21.4.7075529"
     
     - name: Build Android APK
       run: |
+        # Set environment variables for buildozer
+        export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+        export ANDROID_HOME=$ANDROID_SDK_ROOT
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/33.0.2
+        
         buildozer android debug
       env:
         BUILDOZER_LOG_LEVEL: 2
-        ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
-        ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
     
     - name: Upload APK artifact
