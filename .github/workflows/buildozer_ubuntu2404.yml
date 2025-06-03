@@ -147,14 +147,35 @@ jobs:
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
         echo "d975f751698a77b662f1254ddbeed3901e976f5a" > ~/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
     
+    - name: Configure buildozer.spec for proper SDK/NDK versions
+      run: |
+        if [ -f buildozer.spec ]; then
+          # Configure buildozer.spec with proper versions
+          sed -i 's/#android.api = 28/android.api = 33/g' buildozer.spec
+          sed -i 's/#android.minapi = 21/android.minapi = 21/g' buildozer.spec
+          sed -i 's/#android.ndk = 23b/android.ndk = 25b/g' buildozer.spec
+          sed -i 's/#android.accept_sdk_license = False/android.accept_sdk_license = True/g' buildozer.spec
+          
+          # Show buildozer.spec contents for debugging
+          echo "=== buildozer.spec contents ==="
+          cat buildozer.spec | grep -E "(android\.api|android\.minapi|android\.ndk|android\.accept_sdk_license)" || echo "No android settings found"
+        fi
+    
     - name: Download and setup Android SDK manually for Buildozer
       run: |
         # Download Android SDK command line tools
         cd ~/.buildozer/android/platform/
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip commandlinetools-linux-9477386_latest.zip
+        
+        # Create both new and old SDK structure for compatibility
         mkdir -p android-sdk/cmdline-tools
+        mkdir -p android-sdk/tools/bin
         mv cmdline-tools android-sdk/cmdline-tools/latest
+        
+        # Create symlinks for backward compatibility
+        ln -s ../../cmdline-tools/latest/bin/sdkmanager android-sdk/tools/bin/sdkmanager
+        ln -s ../../cmdline-tools/latest/bin/avdmanager android-sdk/tools/bin/avdmanager
         
         # Set up SDK paths
         export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
@@ -163,7 +184,6 @@ jobs:
         # Install necessary components
         yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
         $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "ndk;21.4.7075529"
     
     - name: Build Android APK
       run: |
