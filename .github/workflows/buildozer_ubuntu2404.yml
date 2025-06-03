@@ -155,10 +155,11 @@ jobs:
           sed -i 's/#android.minapi = 21/android.minapi = 21/g' buildozer.spec
           sed -i 's/#android.ndk = 23b/android.ndk = 25b/g' buildozer.spec
           sed -i 's/#android.accept_sdk_license = False/android.accept_sdk_license = True/g' buildozer.spec
+          sed -i 's/#android.archs = arm64-v8a, armeabi-v7a/android.archs = arm64-v8a/g' buildozer.spec
           
           # Show buildozer.spec contents for debugging
           echo "=== buildozer.spec contents ==="
-          cat buildozer.spec | grep -E "(android\.api|android\.minapi|android\.ndk|android\.accept_sdk_license)" || echo "No android settings found"
+          cat buildozer.spec | grep -E "(android\.api|android\.minapi|android\.ndk|android\.accept_sdk_license|android\.archs)" || echo "No android settings found"
         fi
     
     - name: Download and setup Android SDK manually for Buildozer
