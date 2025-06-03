@@ -9,7 +9,7 @@ source.exclude_exts = spec,txt
 source.exclude_dirs = tests, bin, venv, __pycache__
 version = 1.3.6
 # requirements = python3,kivy==2.1.0,kivymd==1.0.1,sdl2_ttf,pillow,beautifulsoup4,soupsieve,requests,typing_extensions
-requirements = python3==3.11.0,hostpython3==3.11.0,kivy==2.1.0,kivymd==1.0.1,cython==0.29.33,sdl2_ttf,pillow
+requirements = python3,hostpython3,kivy,kivymd,cython==0.29.33,sdl2_ttf,pillow
 orientation = portrait
 osx.python_version = 3
 osx.kivy_version = 1.9.1
